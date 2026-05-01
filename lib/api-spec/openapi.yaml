@@ -3,20 +3,30 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Team Task Manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User operations
+  - name: projects
+    description: Project operations
+  - name: members
+    description: Project member operations
+  - name: tasks
+    description: Task operations
+  - name: dashboard
+    description: Dashboard aggregates
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +34,428 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (for assignment)
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects for current user
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectBody"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Not found
+    put:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project (Admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectBody"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project (Admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /projects/{projectId}/members:
+    get:
+      operationId: listProjectMembers
+      tags: [members]
+      summary: List project members
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectMember"
+    post:
+      operationId: addProjectMember
+      tags: [members]
+      summary: Add a member to project (Admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberBody"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMember"
+
+  /projects/{projectId}/members/{userId}:
+    put:
+      operationId: updateProjectMember
+      tags: [members]
+      summary: Update member role (Admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberBody"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMember"
+    delete:
+      operationId: removeProjectMember
+      tags: [members]
+      summary: Remove a member from project (Admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed
+
+  /projects/{projectId}/tasks:
+    get:
+      operationId: listProjectTasks
+      tags: [tasks]
+      summary: List tasks for a project
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [todo, in_progress, done]
+        - name: assigneeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task in a project
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskBody"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /projects/{projectId}/tasks/{taskId}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get a task by ID
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    put:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskBody"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary for current user
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/my-tasks:
+    get:
+      operationId: getMyTasks
+      tags: [dashboard]
+      summary: Get all tasks assigned to current user
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Tasks assigned to me
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /dashboard/overdue:
+    get:
+      operationId: getOverdueTasks
+      tags: [dashboard]
+      summary: Get overdue tasks across all user projects
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Overdue tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
 components:
+  securitySchemes:
+    clerkAuth:
+      type: http
+      scheme: bearer
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +465,282 @@ components:
       required:
         - status
 
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, member]
+          nullable: true
+      required:
+        - id
+        - email
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ownerId:
+          type: string
+        memberCount:
+          type: integer
+        taskCount:
+          type: integer
+        completedTaskCount:
+          type: integer
+        myRole:
+          type: string
+          enum: [admin, member]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - ownerId
+        - memberCount
+        - taskCount
+        - completedTaskCount
+        - myRole
+        - createdAt
+        - updatedAt
+
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            members:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProjectMember"
+          required:
+            - members
+
+    CreateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+      required:
+        - name
+
+    UpdateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+
+    ProjectMember:
+      type: object
+      properties:
+        userId:
+          type: string
+        projectId:
+          type: integer
+        role:
+          type: string
+          enum: [admin, member]
+        joinedAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - userId
+        - projectId
+        - role
+        - joinedAt
+        - user
+
+    AddMemberBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+      required:
+        - userId
+        - role
+
+    UpdateMemberBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+      required:
+        - role
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        assigneeId:
+          type: string
+          nullable: true
+        assignee:
+          $ref: "#/components/schemas/UserProfile"
+          nullable: true
+        creatorId:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+        projectName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - title
+        - status
+        - priority
+        - creatorId
+        - createdAt
+        - updatedAt
+
+    CreateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        assigneeId:
+          type: string
+          nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - title
+
+    UpdateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        assigneeId:
+          type: string
+          nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalProjects:
+          type: integer
+        totalTasks:
+          type: integer
+        completedTasks:
+          type: integer
+        inProgressTasks:
+          type: integer
+        todoTasks:
+          type: integer
+        overdueTasks:
+          type: integer
+        myAssignedTasks:
+          type: integer
+        tasksByPriority:
+          type: object
+          properties:
+            high:
+              type: integer
+            medium:
+              type: integer
+            low:
+              type: integer
+          required:
+            - high
+            - medium
+            - low
+      required:
+        - totalProjects
+        - totalTasks
+        - completedTasks
+        - inProgressTasks
+        - todoTasks
+        - overdueTasks
+        - myAssignedTasks
+        - tasksByPriority
